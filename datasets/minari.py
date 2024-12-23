@@ -1,70 +1,87 @@
 import minari
 import numpy as np
 
-
-
 class Minari:
-    def __init__(self, dataset_id, include_keys=None, normalize_rewards_flag=True):
+    def __init__(self, dataset_id, include_keys=None, normalize_rewards=True):
         self.dataset_id = dataset_id
         self.include_keys = include_keys or [
             'observations', 'actions', 'rewards', 'terminations', 'truncations',
-            'next_observations', 'next_actions', 'next_steps', 'steps',
+            'next_observations', 'next_actions', 'steps',
             'prev_observations', 'prev_actions', 'prev_rewards',
             'prev_terminations', 'prev_truncations']
-        self.normalize_rewards_flag = normalize_rewards_flag
-        self.dataset = minari.load_dataset(dataset_id, True)
-        self.data = {key: [] for key in self.include_keys}
+        self.normalize_rewards = normalize_rewards
+        self.dataset = minari.load_dataset(dataset_id, download=True)
+        self.processed_data = {key: [] for key in self.include_keys}
 
-    def _append_data(self, key, value):
+    def _append_to_processed_data(self, key, value):
         if key in self.include_keys:
-            self.data[key].append(value)
+            self.processed_data[key].append(value)
 
     def _get_previous_value(self, values, index, default):
         return values[index - 1] if index > 0 else default
 
+    def _normalize_rewards(self, rewards):
+        rewards = np.array(rewards)
+        if rewards.size == 0:
+            return rewards
+        return (rewards - np.min(rewards)) / (np.max(rewards) - np.min(rewards))
+
     def _process_episode(self, episode):
         episode_length = len(episode.observations)
 
-        for i in range(min(100, episode_length - 1)):
-            self._append_data('observations', episode.observations[i])
-            self._append_data('actions', episode.actions[i])
-            self._append_data('rewards', episode.rewards[i])
-            self._append_data('terminations', episode.terminations[i])
-            self._append_data('truncations', episode.truncations[i])
-            self._append_data('next_observations', episode.observations[i + 1])
+        for step_index in range(min(100, episode_length - 1)):
+            self._append_to_processed_data('observations', episode.observations[step_index])
+            self._append_to_processed_data('actions', episode.actions[step_index])
+            self._append_to_processed_data('rewards', episode.rewards[step_index])
+            self._append_to_processed_data('terminations', episode.terminations[step_index])
+            self._append_to_processed_data('truncations', episode.truncations[step_index])
+            self._append_to_processed_data('next_observations', episode.observations[step_index + 1])
 
-            next_act = episode.actions[i + 1] if i + 1 < episode_length else np.zeros_like(episode.actions[i])
-            self._append_data('next_actions', next_act)
-            self._append_data('next_steps', i + 2)
-            self._append_data('steps', i + 1)
+            next_action = episode.actions[step_index + 1] if step_index + 1 < episode_length else np.zeros_like(episode.actions[step_index])
+            self._append_to_processed_data('next_actions', next_action)
+            self._append_to_processed_data('steps', step_index + 1)
 
-            prev_obs = self._get_previous_value(episode.observations, i, np.zeros_like(episode.observations[i]))
-            self._append_data('prev_observations', prev_obs)
+            previous_observation = self._get_previous_value(episode.observations, step_index, np.zeros_like(episode.observations[step_index]))
+            self._append_to_processed_data('prev_observations', previous_observation)
 
-            prev_act = self._get_previous_value(episode.actions, i, np.zeros_like(episode.actions[i]))
-            self._append_data('prev_actions', prev_act)
+            previous_action = self._get_previous_value(episode.actions, step_index, np.zeros_like(episode.actions[step_index]))
+            self._append_to_processed_data('prev_actions', previous_action)
 
-            prev_rew = self._get_previous_value(episode.rewards, i, 0.0)
-            self._append_data('prev_rewards', prev_rew)
+            previous_reward = self._get_previous_value(episode.rewards, step_index, 0.0)
+            if self.normalize_rewards:
+                previous_reward = self._normalize_rewards([previous_reward])[0]
+            self._append_to_processed_data('prev_rewards', previous_reward)
 
-            prev_term = self._get_previous_value(episode.terminations, i, 0)
-            self._append_data('prev_terminations', prev_term)
+            previous_termination = self._get_previous_value(episode.terminations, step_index, 0)
+            self._append_to_processed_data('prev_terminations', previous_termination)
 
-            prev_trunc = self._get_previous_value(episode.truncations, i, 0)
-            self._append_data('prev_truncations', prev_trunc)
+            previous_truncation = self._get_previous_value(episode.truncations, step_index, 0)
+            self._append_to_processed_data('prev_truncations', previous_truncation)
 
     def download(self):
+        environment = self.dataset.recover_environment()
+        return self.dataset, environment
+
+    def download_processed(self):
         for episode in self.dataset.iterate_episodes():
             self._process_episode(episode)
 
-        if 'rewards' in self.include_keys and self.normalize_rewards_flag:
-            self.data['rewards'] = normalize_rewards(self.data['rewards'])
+        if 'rewards' in self.include_keys and self.normalize_rewards:
+            self.processed_data['rewards'] = self._normalize_rewards(self.processed_data['rewards'])
 
         if 'terminations' in self.include_keys and 'truncations' in self.include_keys:
-            self.data['dones'] = np.logical_or(
-                self.data['terminations'], self.data['truncations']
+            self.processed_data['dones'] = np.logical_or(
+                self.processed_data['terminations'], self.processed_data['truncations']
             ).astype(int)
 
-        self.data = {key: np.array(value) for key, value in self.data.items()}
+        self.processed_data = {key: np.array(value) for key, value in self.processed_data.items()}
 
-        return self.dataset, self.data
+        environment = self.dataset.recover_environment()
+        return self.processed_data, environment
+
+
+#%%
+m = Minari('D4RL/door/expert-v2')
+v1, v2 = m.download_processed()
+#%%
+v2
