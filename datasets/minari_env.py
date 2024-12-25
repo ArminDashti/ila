@@ -1,12 +1,13 @@
 import minari
 import numpy as np
 
+
 class Minari:
     def __init__(self, dataset_id, include_keys=None, normalize_rewards=True):
         self.dataset_id = dataset_id
         self.include_keys = include_keys or [
             'observations', 'actions', 'rewards', 'terminations', 'truncations',
-            'next_observations', 'next_actions', 'steps',
+            'next_observations', 'next_actions', 'steps', 'next_steps', 'prev_steps',
             'prev_observations', 'prev_actions', 'prev_rewards',
             'prev_terminations', 'prev_truncations']
         self.normalize_rewards = normalize_rewards
@@ -58,9 +59,14 @@ class Minari:
             previous_truncation = self._get_previous_value(episode.truncations, step_index, 0)
             self._append_to_processed_data('prev_truncations', previous_truncation)
 
+            next_step = step_index + 1 if step_index + 1 < episode_length else None
+            prev_step = step_index if step_index > 0 else None
+
+            self._append_to_processed_data('next_steps', next_step)
+            self._append_to_processed_data('prev_steps', prev_step)
+
     def download(self):
-        environment = self.dataset.recover_environment()
-        return self.dataset, environment
+        return self.dataset
 
     def download_processed(self):
         for episode in self.dataset.iterate_episodes():
@@ -76,12 +82,12 @@ class Minari:
 
         self.processed_data = {key: np.array(value) for key, value in self.processed_data.items()}
 
-        environment = self.dataset.recover_environment()
-        return self.processed_data, environment
+        return self.processed_data
 
+    def env(self):
+        return self.dataset.recover_environment()
 
-#%%
-m = Minari('D4RL/door/expert-v2')
-v1, v2 = m.download_processed()
-#%%
-v2
+if __name__ == "__main__":
+    minari_ = Minari('D4RL/door/expert-v2')
+    ds = minari_.download_processed()
+    print(ds.keys())
