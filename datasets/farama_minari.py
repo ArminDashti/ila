@@ -120,7 +120,6 @@ minari_instance = Dataset('D4RL/door/expert-v2')
 
 # %%
 data = minari_instance.to_dict()
-print('done')
 data = add_nexts(data, ['states'])
 data = normalize(data, ['rewards'])
 
