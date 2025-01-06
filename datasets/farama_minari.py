@@ -5,7 +5,7 @@ import numpy as np
 def add_nexts(data, keys):
     for key in keys:
         if key in data:
-            shifted_data = np.empty_like(data[key], dtype=object)
+            shifted_data = np.empty_like(data[key], dtype=float)
             shifted_data[:-1] = data[key][1:]
             shifted_data[-1] = None
             data[f"next_{key}"] = shifted_data
@@ -77,7 +77,7 @@ class Dataset:
         return self.processed_data
 
     def env(self):
-        return self.dataset
+        return self.dataset.recover_environment(render_mode='rgb_array')
 
     @property
     def minari_instance(self):
@@ -115,12 +115,13 @@ def normalize(processed_data, keys, replace=False):
     return processed_data
 
 
-minari_instance = Dataset('D4RL/door/expert-v2')
+minari_instance = Dataset('D4RL/door/human-v2')
 
 
 # %%
 data = minari_instance.to_dict()
-data = add_nexts(data, ['states'])
-data = normalize(data, ['rewards'])
+minari_instance.shapes
 
+# %%
+data = add_nexts(data, ['states'])
 # %%
