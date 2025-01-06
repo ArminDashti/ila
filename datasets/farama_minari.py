@@ -1,6 +1,6 @@
-#%%
 import minari
 import numpy as np
+
 
 def add_nexts(data, keys):
     for key in keys:
@@ -115,13 +115,12 @@ def normalize(processed_data, keys, replace=False):
     return processed_data
 
 
-minari_instance = Dataset('D4RL/door/human-v2')
 
 
-# %%
-data = minari_instance.to_dict()
-minari_instance.shapes
 
-# %%
-data = add_nexts(data, ['states'])
-# %%
+if __name__ == '__main__':
+    minari_instance = Dataset('D4RL/door/human-v2')
+    data = minari_instance.to_dict()
+    data = add_nexts(data, ['states'])
+    print(data.keys())
+
