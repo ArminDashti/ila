@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 class ValueFunction(nn.Module):
     def __init__(self, layers):
-        super(ValueFunction, self).__init__()
+        super(Value, self).__init__()
         self.layers = nn.ModuleList()
 
         for i in range(len(layers) - 1):
